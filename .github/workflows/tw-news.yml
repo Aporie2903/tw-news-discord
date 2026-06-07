@@ -1,0 +1,46 @@
+name: Total War news -> Discord
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tw-news
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install cloudscraper beautifulsoup4
+
+      - name: Run script
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          TW_STATE_FILE: state/seen.json
+        run: python tw_news_to_discord.py
+
+      - name: Persist state
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add state/seen.json
+          if git diff --staged --quiet; then
+            echo "Aucun changement d'etat, rien a committer."
+          else
+            git commit -m "update seen state"
+            git push
+          fi
